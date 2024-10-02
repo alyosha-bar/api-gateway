@@ -24,7 +24,7 @@ app.get('/tracking', (req, res) => {
     const script = `
         (function(global) {
             // Your tracking server URL
-            const trackingServerUrl = '/api/track'; // should go to /api/track/ID
+            const trackingServerUrl = 'https://tracker-api-gateway.onrender.com/track'; // should go to /api/track/ID
         
             // Save the original fetch function to use later
             const originalFetch = global.fetch;
