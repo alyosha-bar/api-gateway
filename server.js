@@ -1,9 +1,33 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config()
+const { Pool } = require('pg');
 
 const app = express();
 const port = process.env.PORT;
+
+// Create a new pool using the DATABASE_URL from the .env file
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Necessary for Neon connections due to SSL
+    }
+});
+  
+// Test the connection
+pool.connect((err, client, release) => {
+if (err) {
+    return console.error('Error acquiring client', err.stack);
+}
+client.query('SELECT NOW()', (err, result) => {
+    release();
+        if (err) {
+        return console.error('Error executing query', err.stack);
+        }
+        console.log(result.rows);  // Should log the current timestamp from the database
+    });
+});
+
 
 // Enable CORS for all routes
 app.use(cors());
@@ -19,7 +43,9 @@ app.get('/', (req, res) => {
 app.get('/tracking', (req, res) => {
 
     const userID = req.query.user
+    const apiToken = req.query.apitoken
     console.log(userID)
+    console.log(apiToken)
 
     const script = `
         (function(global) {
@@ -88,20 +114,25 @@ app.post('/track', (req, res) => { // change the route to /track/:id
     // save req.body into database with associated user id
     console.log("Adding into the database.")
 
-    // update usage of THIS API where the user is the same
+    console.log('Received tracking data:', req.body);
+
+    // 1. save into collection of the id which corresponds to user token
+    // 2. decode api token  --> find api name being tracked
+    // 2. save into monthly document for that api
+
+    // update usage
         // calculate response time 
         // date, time and month of the request
         // save status code (count how many of which status code are there)
-
     
+    // UPDATE OR INSERT into database
 
-
-
-    console.log('Received tracking data:', req.body);
 
     res.send('Tracking data received!!!');
 });
 
-app.listen(port, () => {
-    console.log(`Server is running at http://localhost:${port}`);
-});
+
+app.listen(process.env.PORT, () => {
+    console.log('Connected to DB & Listening on port', process.env.PORT)
+})
+
