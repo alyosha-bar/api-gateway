@@ -82,6 +82,7 @@ app.get('/tracking', (req, res) => {
             function sendTrackingData(url, init, status, responseTime) {
                 const trackingData = {
                     userId: ${userID}, // Replace with the actual user ID
+                    apiToken: ${apiToken},
                     apiUrl: url,
                     method: (init && init.method) || 'GET', // Default to GET if no method
                     status: status,
