@@ -47,6 +47,11 @@ app.get('/tracking', (req, res) => {
     console.log(userID)
     console.log(apiToken)
 
+    // not the best way:
+    // fetch the api base url based off of token --> which i dont know how to decode
+    // and check that against the resource variable
+
+
     const script = `
         (function(global) {
             // Your tracking server URL
@@ -127,7 +132,10 @@ app.post('/track', (req, res) => { // change the route to /track/:id
         // save status code (count how many of which status code are there)
     
     // UPDATE OR INSERT into database
-
+    const end_date = "2024-01-30"
+    if (end_date > req.body.timestamp.split('T')[0]) {
+        console.log("here")
+    }
 
     res.send('Tracking data received!!!');
 });
