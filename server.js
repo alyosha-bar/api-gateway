@@ -74,7 +74,7 @@ app.get('/tracking', (req, res) => {
                     // Call the original fetch function
                     
                     // Ensure the base URL ends with a slash for accurate comparison
-                    const normalizedBaseUrl = ${baseUrl}.endsWith('/') ? ${baseUrl} : ${baseUrl} + '/';
+                    const normalizedBaseUrl = ${baseurl}.endsWith('/') ? ${baseurl} : ${baseurl} + '/';
                     
                     // Normalize the request URL by checking if it starts with the base URL
                     if (!requestUrl.startsWith(normalizedBaseUrl)) {
