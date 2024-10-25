@@ -77,7 +77,8 @@ app.get('/tracking', (req, res) => {
                     const normalizedBaseUrl = ${baseurl}.endsWith('/') ? ${baseurl} : ${baseurl} + '/';
                     
                     // Normalize the request URL by checking if it starts with the base URL
-                    if (!requestUrl.startsWith(normalizedBaseUrl)) {
+                    if (!resource.startsWith(normalizedBaseUrl)) {
+                        console.log("Here now.")
                         return
                     }
                     
