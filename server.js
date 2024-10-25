@@ -47,7 +47,7 @@ app.get('/', (req, res) => {
 app.get('/tracking', (req, res) => {
 
     const userID = req.query.user
-    const apiToken = req.query.apitoken
+    const apiToken = String(req.query.apitoken)
     const baseurl = req.query.base
     console.log(userID)
     console.log(apiToken)
@@ -78,7 +78,6 @@ app.get('/tracking', (req, res) => {
                     
                     // Normalize the request URL by checking if it starts with the base URL
                     if (!resource.startsWith(normalizedBaseUrl)) {
-                        console.log("Here now.")
                         return
                     }
                     
@@ -103,10 +102,10 @@ app.get('/tracking', (req, res) => {
             // Function to send tracking data
             function sendTrackingData(url, init, status, responseTime) {
                 const trackingData = {
-                    userId: ${userID}, // Replace with the actual user ID
-                    apiToken: '${apiToken}',
+                    userId: ${userID},
+                    apiToken: ${apiToken},
                     apiUrl: url,
-                    method: (init && init.method) || 'GET', // Default to GET if no method
+                    method: (init && init.method) || 'GET',
                     status: status,
                     responseTime: responseTime,
                     timestamp: new Date().toISOString(),
