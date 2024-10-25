@@ -137,7 +137,7 @@ app.post('/track', (req, res) => { // change the route to /track/:id
     console.log("Adding into the database.")
 
     console.log('Received tracking data:', req.body);
-    const token = req.body.apiToken
+    const token = String(req.body.apiToken)
     // 1. decode api token  --> find api name being tracked
 
     // 2. 
