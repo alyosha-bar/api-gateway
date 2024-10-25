@@ -3,6 +3,10 @@ const cors = require('cors');
 require('dotenv').config()
 const { Pool } = require('pg');
 
+// token stuff
+const jwt = require('jsonwebtoken')
+const secret = process.env.SECRET
+
 const app = express();
 const port = process.env.PORT;
 
@@ -44,8 +48,10 @@ app.get('/tracking', (req, res) => {
 
     const userID = req.query.user
     const apiToken = req.query.apitoken
+    const baseurl = req.query.base
     console.log(userID)
     console.log(apiToken)
+    console.log(baseurl)
 
     // not the best way:
     // fetch the api base url based off of token --> which i dont know how to decode
@@ -66,6 +72,16 @@ app.get('/tracking', (req, res) => {
                 
                 try {
                     // Call the original fetch function
+                    
+                    // Ensure the base URL ends with a slash for accurate comparison
+                    const normalizedBaseUrl = ${baseUrl}.endsWith('/') ? ${baseUrl} : ${baseUrl} + '/';
+                    
+                    // Normalize the request URL by checking if it starts with the base URL
+                    if (!requestUrl.startsWith(normalizedBaseUrl)) {
+                        return
+                    }
+                    
+                    // execute original fetch
                     const response = await originalFetch(resource, init);
                     
                     // Calculate response time
@@ -121,20 +137,35 @@ app.post('/track', (req, res) => { // change the route to /track/:id
     console.log("Adding into the database.")
 
     console.log('Received tracking data:', req.body);
+    const token = req.body.apiToken
+    // 1. decode api token  --> find api name being tracked
 
-    // 1. save into collection of the id which corresponds to user token
-    // 2. decode api token  --> find api name being tracked
-    // 2. save into monthly document for that api
+    // 2. 
+    
+    // API TOKEN DECODING
+    // verify the jwt by using TOKEN and the SECRET
+    // reveals api name / id?
+    const decoded = jwt.verify(token, secret);
+    console.log("Decoded Name:", decoded.name);
 
-    // update usage
-        // calculate response time 
-        // date, time and month of the request
-        // save status code (count how many of which status code are there)
+
+    // TIMESTAMP STUFF
+    const new_timestamp = Date.parse(req.body.timestamp.split('T')[0])
+    
     
     // UPDATE OR INSERT into database
-    const end_date = "2024-01-30"
-    if (end_date > req.body.timestamp.split('T')[0]) {
-        console.log("here")
+
+    // Fetch from database based on token / api ID
+    const end_date = Date.parse("2024-01-30")
+    
+    if (end_date < new_timestamp) {
+        console.log("here.")
+        // timestamp is after the end date
+        // INSERT A NEW RECORD
+    } else {
+        console.log("not there.")
+        // timestamp is before end date
+        // UPDATE A RECORD
     }
 
     res.send('Tracking data received!!!');
