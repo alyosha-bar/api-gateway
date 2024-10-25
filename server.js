@@ -45,62 +45,77 @@ app.get('/', (req, res) => {
 });
 
 app.get('/tracking', (req, res) => {
-    const userID = req.query.user;
-    const apiToken = req.query.apitoken ? String(req.query.apitoken) : "";
-    const baseurl = req.query.base ? String(req.query.base) : "";
 
-    // Log the values for debugging
-    console.log("UserID:", userID);
-    console.log("API Token:", apiToken);
-    console.log("Base URL:", baseurl);
+    const userID = req.query.user
+    const apiToken = String(req.query.apitoken)
+    const baseurl = req.query.base
+    console.log(userID)
+    console.log(apiToken)
+    console.log(baseurl)
+
+    // not the best way:
+    // fetch the api base url based off of token --> which i dont know how to decode
+    // and check that against the resource variable
+
 
     const script = `
         (function(global) {
-            const trackingServerUrl = 'https://tracker-api-gateway.onrender.com/track';
+            // Your tracking server URL
+            const trackingServerUrl = 'https://tracker-api-gateway.onrender.com/track'; // should go to /api/track/ID
+        
+            // Save the original fetch function to use later
             const originalFetch = global.fetch;
-
-            const baseurl = ${JSON.stringify(baseurl)}; // Ensure baseurl is a valid string
-            const userID = ${JSON.stringify(userID)}; // Ensure userID is a valid string
-            const apiToken = ${JSON.stringify(apiToken)}; // Ensure apiToken is a valid string
-
+        
+            // The tracking function that intercepts API requests
             global.fetch = async function(resource, init) {
                 const startTime = Date.now();
-
+                
                 try {
-                    const normalizedBaseUrl = baseurl.endsWith('/') ? baseurl : baseurl + '/';
-
+                    // Call the original fetch function
+                    
+                    // Ensure the base URL ends with a slash for accurate comparison
+                    const normalizedBaseUrl = ${baseurl}.endsWith('/') ? ${baseurl} : ${baseurl} + '/';
+                    
+                    // Normalize the request URL by checking if it starts with the base URL
                     if (!resource.startsWith(normalizedBaseUrl)) {
-                        return originalFetch(resource, init); // Skip tracking if URL doesn’t match
+                        return
                     }
-
+                    
+                    // execute original fetch
                     const response = await originalFetch(resource, init);
+                    
+                    // Calculate response time
                     const endTime = Date.now();
                     const responseTime = endTime - startTime;
-
+            
+                    // Send tracking data to your server
                     sendTrackingData(resource, init, response.status, responseTime);
-
-                    return response;
+            
+                    return response; // Return the original response for the app to use
                 } catch (error) {
+                    // Handle errors (also track if needed)
                     sendTrackingData(resource, init, 'error', -1);
-                    throw error;
+                    throw error; // Re-throw error for app to handle
                 }
             };
-
+        
+            // Function to send tracking data
             function sendTrackingData(url, init, status, responseTime) {
                 const trackingData = {
-                    userId: userID,
-                    apiToken: apiToken,
+                    userId: ${userID},
+                    apiToken: ${apiToken},
                     apiUrl: url,
                     method: (init && init.method) || 'GET',
                     status: status,
                     responseTime: responseTime,
                     timestamp: new Date().toISOString(),
                 };
-
+        
+                // Send data to the tracking server
                 originalFetch(trackingServerUrl, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                    'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(trackingData),
                 }).catch(err => console.error('Tracking failed:', err));
@@ -108,12 +123,16 @@ app.get('/tracking', (req, res) => {
         })(window);
     `;
 
+
     res.setHeader('Content-Type', 'application/javascript');
     res.send(script);
-});
+
+})
+
 
 app.post('/track', (req, res) => { // change the route to /track/:id
     
+
     // save req.body into database with associated user id
     console.log("Adding into the database.")
 
