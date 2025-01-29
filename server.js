@@ -1,12 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config()
+require('dotenv').config();
 const { Pool } = require('pg');
+const jwt = require('jsonwebtoken');
 
-// token stuff
-const jwt = require('jsonwebtoken')
-const secret = process.env.SECRET
-
+const secret = process.env.SECRET;
 const app = express();
 const port = process.env.PORT;
 
@@ -17,105 +15,60 @@ const pool = new Pool({
         rejectUnauthorized: false // Necessary for Neon connections due to SSL
     }
 });
-  
-// Test the connection
-pool.connect((err, client, release) => {
-if (err) {
-    return console.error('Error acquiring client', err.stack);
-}
-client.query('SELECT NOW()', (err, result) => {
-    release();
-        if (err) {
-        return console.error('Error executing query', err.stack);
-        }
-        console.log(result.rows);  // Should log the current timestamp from the database
-    });
-});
-
 
 // Enable CORS for all routes
 app.use(cors());
-
-// Middleware to parse JSON request bodies
 app.use(express.json());
 
-
-app.get('/', (req, res) => {
-    res.send('Hello, World!');
-});
-
+// Tracking endpoint
 app.get('/tracking', (req, res) => {
-
-    const userID = req.query.user
-    const apiToken = String(req.query.apitoken)
-    const baseurl = req.query.base
-    console.log(userID)
-    console.log(apiToken)
-    console.log(baseurl)
-
-    // not the best way:
-    // fetch the api base url based off of token --> which i dont know how to decode
-    // and check that against the resource variable
-
+    const userID = req.query.user;
+    const apiToken = String(req.query.apitoken);
+    const baseurl = req.query.base;
 
     const script = `
         (function(global) {
-            // Your tracking server URL
-            const trackingServerUrl = 'https://tracker-api-gateway.onrender.com/track'; // should go to /api/track/ID
-        
-            // Save the original fetch function to use later
+            const trackingServerUrl = 'https://tracker-api-gateway.onrender.com/track';
             const originalFetch = global.fetch;
-        
-            // The tracking function that intercepts API requests
+
             global.fetch = async function(resource, init) {
                 const startTime = Date.now();
-                
+                const normalizedBaseUrl = ${JSON.stringify(baseurl)}.endsWith('/') 
+                    ? ${JSON.stringify(baseurl)} 
+                    : ${JSON.stringify(baseurl)} + '/';
+
+                if (!resource.startsWith(normalizedBaseUrl)) {
+                    return originalFetch(resource, init);
+                }
+
                 try {
-                    // Call the original fetch function
-                    
-                    // Ensure the base URL ends with a slash for accurate comparison
-                    const normalizedBaseUrl = ${baseurl}.endsWith('/') ? ${baseurl} : ${baseurl} + '/';
-                    
-                    // Normalize the request URL by checking if it starts with the base URL
-                    if (!resource.startsWith(normalizedBaseUrl)) {
-                        return
-                    }
-                    
-                    // execute original fetch
                     const response = await originalFetch(resource, init);
-                    
-                    // Calculate response time
                     const endTime = Date.now();
                     const responseTime = endTime - startTime;
-            
-                    // Send tracking data to your server
+
                     sendTrackingData(resource, init, response.status, responseTime);
-            
-                    return response; // Return the original response for the app to use
+                    return response;
                 } catch (error) {
-                    // Handle errors (also track if needed)
                     sendTrackingData(resource, init, 'error', -1);
-                    throw error; // Re-throw error for app to handle
+                    throw error;
                 }
             };
-        
-            // Function to send tracking data
+
             function sendTrackingData(url, init, status, responseTime) {
                 const trackingData = {
-                    userId: ${userID},
-                    apiToken: ${apiToken},
+                    userId: ${JSON.stringify(userID)},
+                    apiToken: ${JSON.stringify(apiToken)},
                     apiUrl: url,
                     method: (init && init.method) || 'GET',
                     status: status,
                     responseTime: responseTime,
                     timestamp: new Date().toISOString(),
                 };
-        
-                // Send data to the tracking server
+
                 originalFetch(trackingServerUrl, {
                     method: 'POST',
                     headers: {
-                    'Content-Type': 'application/json',
+                        'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(trackingData),
                 }).catch(err => console.error('Tracking failed:', err));
@@ -123,56 +76,23 @@ app.get('/tracking', (req, res) => {
         })(window);
     `;
 
-
     res.setHeader('Content-Type', 'application/javascript');
     res.send(script);
+});
 
-})
-
-
-app.post('/track', (req, res) => { // change the route to /track/:id
-    
-
-    // save req.body into database with associated user id
-    console.log("Adding into the database.")
-
+// Tracking data endpoint
+app.post('/track', (req, res) => {
     console.log('Received tracking data:', req.body);
-    const token = String(req.body.apiToken)
-    // 1. decode api token  --> find api name being tracked
-
-    // 2. 
-    
-    // API TOKEN DECODING
-    // verify the jwt by using TOKEN and the SECRET
-    // reveals api name / id?
+    const token = String(req.body.apiToken);
     const decoded = jwt.verify(token, secret);
     console.log("Decoded Name:", decoded.name);
 
-
-    // TIMESTAMP STUFF
-    const new_timestamp = Date.parse(req.body.timestamp.split('T')[0])
-    
-    
-    // UPDATE OR INSERT into database
-
-    // Fetch from database based on token / api ID
-    const end_date = Date.parse("2024-01-30")
-    
-    if (end_date < new_timestamp) {
-        console.log("here.")
-        // timestamp is after the end date
-        // INSERT A NEW RECORD
-    } else {
-        console.log("not there.")
-        // timestamp is before end date
-        // UPDATE A RECORD
-    }
+    // Handle database operations here
+    // ...
 
     res.send('Tracking data received!!!');
 });
 
-
-app.listen(process.env.PORT, () => {
-    console.log('Connected to DB & Listening on port', process.env.PORT)
-})
-
+app.listen(port, () => {
+    console.log('Connected to DB & Listening on port', port);
+});
