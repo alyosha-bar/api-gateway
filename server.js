@@ -1,10 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv').config()
 const { Pool } = require('pg');
-const jwt = require('jsonwebtoken');
 
-const secret = process.env.SECRET;
+// token stuff
+const jwt = require('jsonwebtoken')
+const secret = process.env.SECRET
+
 const app = express();
 const port = process.env.PORT;
 
@@ -15,10 +17,32 @@ const pool = new Pool({
         rejectUnauthorized: false // Necessary for Neon connections due to SSL
     }
 });
+  
+// Test the connection
+pool.connect((err, client, release) => {
+if (err) {
+    return console.error('Error acquiring client', err.stack);
+}
+client.query('SELECT NOW()', (err, result) => {
+    release();
+        if (err) {
+        return console.error('Error executing query', err.stack);
+        }
+        console.log(result.rows);  // Should log the current timestamp from the database
+    });
+});
+
 
 // Enable CORS for all routes
 app.use(cors());
+
+// Middleware to parse JSON request bodies
 app.use(express.json());
+
+
+app.get('/', (req, res) => {
+    res.send('Hello, World!');
+});
 
 // Tracking endpoint
 app.get('/tracking', (req, res) => {
@@ -80,19 +104,51 @@ app.get('/tracking', (req, res) => {
     res.send(script);
 });
 
-// Tracking data endpoint
-app.post('/track', (req, res) => {
-    console.log('Received tracking data:', req.body);
-    const token = String(req.body.apiToken);
-    const decoded = jwt.verify(token, secret);
-    console.log("Decoded Name:", decoded.name);
 
-    // Handle database operations here
-    // ...
+
+app.post('/track', (req, res) => { // change the route to /track/:id
+    
+
+    // save req.body into database with associated user id
+    console.log("Adding into the database.")
+
+    console.log('Received tracking data:', req.body);
+    const token = String(req.body.apiToken)
+    // 1. decode api token  --> find api name being tracked
+
+    // 2. 
+    
+    // API TOKEN DECODING
+    // verify the jwt by using TOKEN and the SECRET
+    // reveals api name / id?
+    // const decoded = jwt.verify(token, secret);
+    // console.log("Decoded Name:", decoded.name);
+
+
+    // TIMESTAMP STUFF
+    const new_timestamp = Date.parse(req.body.timestamp.split('T')[0])
+    
+    
+    // UPDATE OR INSERT into database
+
+    // Fetch from database based on token / api ID
+    const end_date = Date.parse("2024-01-30")
+    
+    if (end_date < new_timestamp) {
+        console.log("here.")
+        // timestamp is after the end date
+        // INSERT A NEW RECORD
+    } else {
+        console.log("not there.")
+        // timestamp is before end date
+        // UPDATE A RECORD
+    }
 
     res.send('Tracking data received!!!');
 });
 
-app.listen(port, () => {
-    console.log('Connected to DB & Listening on port', port);
-});
+
+app.listen(process.env.PORT, () => {
+    console.log('Connected to DB & Listening on port', process.env.PORT)
+})
+
