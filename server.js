@@ -118,7 +118,9 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
 
     // 1. get api_id from api_token
     const query = "SELECT ap.id FROM api ap WHERE ap.token = $1"
-    const result = await pool.query(query, [apitoken])
+    // const result = await pool.query(query, [apitoken])
+
+    console.log(query)
 
     if (result.rows === undefined) {
         res.status(400).json({"message": "Invalid API token."})
