@@ -174,21 +174,30 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
     } else {
         console.log("not there.");
     
-        // Adjust end_date to the first day of its month
-        const adjustedEndDate = getFirstDayOfMonth(new_timestamp);
-    
-        // UPDATE THE EXISTING RECORD
-        let updateQuery = ""
+        // Determine the correct query based on status_code
+        let updateQuery = "";
         if (status_code >= 200 && status_code < 400) {
-            updateQuery = "UPDATE api_usage SET end_date = $1, total_req = total_req + 1 WHERE api_id = $2 AND end_date = $3";
+            updateQuery = `
+                UPDATE api_usage 
+                SET total_req = total_req + 1 
+                WHERE api_id = $1 
+                AND $2 BETWEEN start_date AND end_date`;
         } else {
-            updateQuery = "UPDATE api_usage SET end_date = $1, total_req = total_req + 1, errorcount = errorcount + 1 WHERE api_id = $2 AND end_date = $3";
+            updateQuery = `
+                UPDATE api_usage 
+                SET total_req = total_req + 1, errorcount = errorcount + 1 
+                WHERE api_id = $1 
+                AND $2 BETWEEN start_date AND end_date`;
         }
-        
-        await pool.query(updateQuery, [adjustedEndDate, api_id, getFirstDayOfMonth(end_date)]);
     
-        console.log("Record updated with end_date set to the beginning of the month.");
+        // Get the first day of the month for newend_date
+        const newend_date = getFirstDayOfMonth(new_timestamp); // Ensure this function exists
+    
+        await pool.query(updateQuery, [api_id, newend_date]);
+    
+        console.log("Record updated where newend_date is between start_date and end_date.");
     }
+    
 
     res.send('Tracking data received!!!');
 });
