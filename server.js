@@ -180,7 +180,7 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
         // UPDATE THE EXISTING RECORD
         let updateQuery = ""
         if (status_code >= 200 && status_code < 400) {
-            updateQuery = "UPDATE api_usage SET end_date = $1, totalreq = totalreq + 1 WHERE api_id = $2 AND end_date = $3";
+            updateQuery = "UPDATE api_usage SET end_date = $1, total_req = totalreq + 1 WHERE api_id = $2 AND end_date = $3";
         } else {
             updateQuery = "UPDATE api_usage SET end_date = $1, totalreq = totalreq + 1, errorcount = errorcount + 1 WHERE api_id = $2 AND end_date = $3";
         }
