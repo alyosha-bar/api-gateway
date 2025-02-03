@@ -117,8 +117,8 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
     const usertoken = String(req.body.userId);
 
     // 1. get api_id from api_token
-    const query = "SELECT ap.id FROM api ap WHERE ap.token = $1"
-    // const result = await pool.query(query, [apitoken])
+    const query = "SELECT ap.id FROM api ap WHERE ap.token = '$1'"
+    const result = await pool.query(query, [apitoken])
 
     console.log(query)
 
