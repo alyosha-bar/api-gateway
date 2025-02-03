@@ -113,8 +113,13 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
     console.log("Adding into the database.")
 
     console.log('Received tracking data:', req.body);
+
+    // decode tracking data:
+    const status_code = req.body.status
+
+
+
     const apitoken = String(req.body.apiToken);
-    const usertoken = String(req.body.userId);
 
     // 1. get api_id from api_token
     const query = "SELECT ap.id FROM api ap WHERE ap.token = $1"
@@ -127,6 +132,7 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
     }
 
     console.log(result.rows)
+    const api_id = result.rows[0].id;
 
     // 3. get api_usages LAtEST end date
 
@@ -137,21 +143,65 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
     
     // UPDATE OR INSERT into database
 
-    // Fetch from database based on token / api ID
-    const end_date = Date.parse("2024-01-30")
+    const endDateQuery = "SELECT MAX(end_date) AS latest_end_date FROM api_usage WHERE api_id = $1";
+    const endDateResult = await pool.query(endDateQuery, [api_id]);
     
-    if (end_date < new_timestamp) {
-        console.log("here.")
-        // timestamp is after the end date
-        // INSERT A NEW RECORD
+    let end_date;
+    if (endDateResult.rows[0].latest_end_date) {
+        end_date = Date.parse(endDateResult.rows[0].latest_end_date);
     } else {
-        console.log("not there.")
-        // timestamp is before end date
-        // UPDATE A RECORD
+        end_date = 0; // Default to a very old date if no records exist
+    }
+
+    if (end_date < new_timestamp) {
+        console.log("here.");
+        
+        // Adjust new_timestamp to the first day of its month
+        const newStart = getFirstDayOfMonth(new_timestamp);
+        const newEnd = getLastDayOfMonth(new_timestamp);
+        
+        
+        // INSERT A NEW RECORD
+        let insertQuery = ""
+        if (status_code == 200 || status_code == 300) {
+            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, totalreq) VALUES ($1, $2, $3, 1)";
+        } else {
+            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, totalreq, errorcount) VALUES ($1, $2, $3, 1, 1)";
+        }
+        await pool.query(insertQuery, [api_id, newStart, newEnd]);
+    
+        console.log("New record inserted with start_date and end_date at the beginning of the month.");
+    } else {
+        console.log("not there.");
+    
+        // Adjust end_date to the first day of its month
+        const adjustedEndDate = getFirstDayOfMonth(new_timestamp);
+    
+        // UPDATE THE EXISTING RECORD
+        let updateQuery = ""
+        if (status_code >= 200 && status_code < 400) {
+            updateQuery = "UPDATE api_usage SET end_date = $1, totalreq = totalreq + 1 WHERE api_id = $2 AND end_date = $3";
+        } else {
+            updateQuery = "UPDATE api_usage SET end_date = $1, totalreq = totalreq + 1, errorcount = errorcount + 1 WHERE api_id = $2 AND end_date = $3";
+        }
+        
+        await pool.query(updateQuery, [adjustedEndDate, api_id, getFirstDayOfMonth(end_date)]);
+    
+        console.log("Record updated with end_date set to the beginning of the month.");
     }
 
     res.send('Tracking data received!!!');
 });
+
+function getFirstDayOfMonth(timestamp) {
+    const date = new Date(timestamp);
+    return new Date(date.getFullYear(), date.getMonth(), 1); // First day of the month
+}
+
+function getLastDayOfMonth(timestamp) {
+    const date = new Date(timestamp);
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0); // Last day of the month
+}
 
 
 app.listen(process.env.PORT, () => {
