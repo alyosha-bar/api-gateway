@@ -106,23 +106,27 @@ app.get('/tracking', (req, res) => {
 
 
 
-app.post('/track', (req, res) => { // change the route to /track/:id
+app.post('/track', async (req, res) => { // change the route to /track/:id
     
 
     // save req.body into database with associated user id
     console.log("Adding into the database.")
 
     console.log('Received tracking data:', req.body);
-    const token = String(req.body.apiToken)
-    // 1. decode api token  --> find api name being tracked
+    const apitoken = String(req.body.apiToken);
+    const usertoken = String(req.body.userId);
 
-    // 2. 
-    
-    // API TOKEN DECODING
-    // verify the jwt by using TOKEN and the SECRET
-    // reveals api name / id?
-    // const decoded = jwt.verify(token, secret);
-    // console.log("Decoded Name:", decoded.name);
+    // 1. get api_id from api_token
+    const query = "SELECT ap.id FROM api ap WHERE ap.token = $1"
+    const result = await pool.query(query, [apitoken])
+
+    if (result.rows === undefined) {
+        res.status(400).json({"message": "Invalid API token."})
+    }
+
+    console.log(result.rows)
+
+    // 3. get api_usages LAtEST end date
 
 
     // TIMESTAMP STUFF
