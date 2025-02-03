@@ -164,9 +164,9 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
         // INSERT A NEW RECORD
         let insertQuery = ""
         if (status_code == 200 || status_code == 300) {
-            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, totalreq) VALUES ($1, $2, $3, 1)";
+            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req) VALUES ($1, $2, $3, 1)";
         } else {
-            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, totalreq, errorcount) VALUES ($1, $2, $3, 1, 1)";
+            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req, errorcount) VALUES ($1, $2, $3, 1, 1)";
         }
         await pool.query(insertQuery, [api_id, newStart, newEnd]);
     
@@ -180,9 +180,9 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
         // UPDATE THE EXISTING RECORD
         let updateQuery = ""
         if (status_code >= 200 && status_code < 400) {
-            updateQuery = "UPDATE api_usage SET end_date = $1, total_req = totalreq + 1 WHERE api_id = $2 AND end_date = $3";
+            updateQuery = "UPDATE api_usage SET end_date = $1, total_req = total_req + 1 WHERE api_id = $2 AND end_date = $3";
         } else {
-            updateQuery = "UPDATE api_usage SET end_date = $1, totalreq = totalreq + 1, errorcount = errorcount + 1 WHERE api_id = $2 AND end_date = $3";
+            updateQuery = "UPDATE api_usage SET end_date = $1, total_req = total_req + 1, errorcount = errorcount + 1 WHERE api_id = $2 AND end_date = $3";
         }
         
         await pool.query(updateQuery, [adjustedEndDate, api_id, getFirstDayOfMonth(end_date)]);
