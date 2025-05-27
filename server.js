@@ -121,6 +121,13 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
 
     const apitoken = String(req.body.apiToken);
 
+    
+    const responseTime = req.body.responseTime
+    console.log(`Response time: ${responseTime}`)
+    console.log(`Response time type: ${responseTime.type}`)
+
+
+
     // 1. get api_id from api_token
     const query = "SELECT ap.id FROM api ap WHERE ap.token = $1"
     const result = await pool.query(query, [apitoken])
@@ -133,9 +140,6 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
 
     console.log(result.rows)
     const api_id = result.rows[0].id;
-
-    // 3. get api_usages LAtEST end date
-
 
     // TIMESTAMP STUFF
     const new_timestamp = Date.parse(req.body.timestamp.split('T')[0])
@@ -150,25 +154,25 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
     if (endDateResult.rows[0].latest_end_date) {
         end_date = Date.parse(endDateResult.rows[0].latest_end_date);
     } else {
-        end_date = 0; // Default to a very old date if no records exist
+        end_date = 0;
     }
 
     if (end_date < new_timestamp) {
         console.log("here.");
         
-        // Adjust new_timestamp to the first day of its month
+        // adjust new_timestamp to the first day of its month
         const newStart = getFirstDayOfMonth(new_timestamp);
         const newEnd = getLastDayOfMonth(new_timestamp);
         
         
         // INSERT A NEW RECORD
         let insertQuery = ""
-        if (status_code == 200 || status_code == 300) {
-            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req) VALUES ($1, $2, $3, 1)";
+        if (status_code >= 200 && status_code < 400) {
+            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req, total_latency) VALUES ($1, $2, $3, 1, $4)";
         } else {
-            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req, errorcount) VALUES ($1, $2, $3, 1, 1)";
+            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req, errorcount, total_latency) VALUES ($1, $2, $3, 1, 1, $4)";
         }
-        await pool.query(insertQuery, [api_id, newStart, newEnd]);
+        await pool.query(insertQuery, [api_id, newStart, newEnd, responseTime]);
     
         console.log("New record inserted with start_date and end_date at the beginning of the month.");
     } else {
@@ -179,21 +183,24 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
         if (status_code >= 200 && status_code < 400) {
             updateQuery = `
                 UPDATE api_usage 
-                SET total_req = total_req + 1 
-                WHERE api_id = $1 
-                AND $2 BETWEEN start_date AND end_date`;
+                SET total_req = total_req + 1,
+                SET total_latecy = total_latency + $1
+                WHERE api_id = $2
+                AND $3 BETWEEN start_date AND end_date`;
         } else {
             updateQuery = `
                 UPDATE api_usage 
-                SET total_req = total_req + 1, errorcount = errorcount + 1 
-                WHERE api_id = $1 
-                AND $2 BETWEEN start_date AND end_date`;
+                SET total_req = total_req + 1,
+                SET total_latecy = total_latency + $1,
+                errorcount = errorcount + 1 
+                WHERE api_id = $2
+                AND $3 BETWEEN start_date AND end_date`;
         }
     
         // Get the first day of the month for newend_date
-        const newend_date = getFirstDayOfMonth(new_timestamp); // Ensure this function exists
+        const newend_date = getFirstDayOfMonth(new_timestamp);
     
-        await pool.query(updateQuery, [api_id, newend_date]);
+        await pool.query(updateQuery, [responseTime ,api_id, newend_date]);
     
         console.log("Record updated where newend_date is between start_date and end_date.");
     }
