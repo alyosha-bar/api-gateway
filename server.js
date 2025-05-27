@@ -184,14 +184,14 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
             updateQuery = `
                 UPDATE api_usage 
                 SET total_req = total_req + 1,
-                SET total_latecy = total_latency + $1
+                SET total_latency = total_latency + $1
                 WHERE api_id = $2
                 AND $3 BETWEEN start_date AND end_date`;
         } else {
             updateQuery = `
                 UPDATE api_usage 
                 SET total_req = total_req + 1,
-                SET total_latecy = total_latency + $1,
+                SET total_latency = total_latency + $1,
                 errorcount = errorcount + 1 
                 WHERE api_id = $2
                 AND $3 BETWEEN start_date AND end_date`;
