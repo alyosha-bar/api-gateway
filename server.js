@@ -105,6 +105,7 @@ app.get('/tracking', (req, res) => {
 });
 
 
+// Track which endpoints are hit
 
 app.post('/track', async (req, res) => { // change the route to /track/:id
     
@@ -168,7 +169,7 @@ app.post('/track', async (req, res) => { // change the route to /track/:id
         // INSERT A NEW RECORD
         let insertQuery = ""
         if (status_code >= 200 && status_code < 400) {
-            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req, total_latency) VALUES ($1, $2, $3, 1, $4)";
+            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req, errorcount, total_latency) VALUES ($1, $2, $3, 1, 0, $4)";
         } else {
             insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req, errorcount, total_latency) VALUES ($1, $2, $3, 1, 1, $4)";
         }
