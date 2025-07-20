@@ -1,5 +1,6 @@
 const express = require('express')
 const {Pool} = require('pg')
+var cors = require('cors')
 
 const app = express()
 const port = 3000
