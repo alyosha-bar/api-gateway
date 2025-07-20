@@ -1,50 +1,67 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config()
-const { Pool } = require('pg');
+const express = require('express')
+const {Pool} = require('pg')
 
-// token stuff
-const jwt = require('jsonwebtoken')
-const secret = process.env.SECRET
+const app = express()
+const port = 3000
 
-const app = express();
-const port = process.env.PORT;
-
-// Create a new pool using the DATABASE_URL from the .env file
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false // Necessary for Neon connections due to SSL
-    }
-});
-  
-// Test the connection
-pool.connect((err, client, release) => {
-if (err) {
-    return console.error('Error acquiring client', err.stack);
-}
-client.query('SELECT NOW()', (err, result) => {
-    release();
-        if (err) {
-        return console.error('Error executing query', err.stack);
+    host: '127.0.0.1',
+    port: 8812,
+    user: 'admin',
+    password: 'quest',
+    database: 'qdb'
+})
+
+// Set the client timezone to UTC
+process.env.TZ = 'UTC';
+
+// allow all origins
+app.use(cors())
+
+// Add middleware to parse JSON body
+app.use(express.json())
+
+// API endpoint to get recent trades
+app.get('/api/trades', async (req, res) => {
+    const {symbol, limit = 10} = req.query
+
+    try {
+        let query
+        let params = []
+
+        if (symbol) {
+            query = 'SELECT * FROM sensor_data;'
+            params = [symbol, limit]
+        } else {
+            query = 'SELECT * FROM sensor_data;'
+            params = [limit]
         }
-        console.log(result.rows);  // Should log the current timestamp from the database
-    });
-});
 
+        const result = await pool.query(query, params)
+        res.json(result.rows)
+    } catch (error) {
+        console.error('API error:', error)
+        res.status(500).json({error: error.message})
+    }
+})
 
-// Enable CORS for all routes
-app.use(cors());
+// API endpoint to get trade statistics
+app.get('/api/stats', async (req, res) => {
+    const {days = 7} = req.query
 
-// Middleware to parse JSON request bodies
-app.use(express.json());
+    try {
+        const result = await pool.query(`
+      SELECT * FROM sensor_data;
+    `, [days])
 
+        res.json(result.rows)
+    } catch (error) {
+        console.error('API error:', error)
+        res.status(500).json({error: error.message})
+    }
+})
 
-app.get('/', (req, res) => {
-    res.send('Hello, World!');
-});
-
-// Tracking endpoint
+// Tracking endpoint --> injected into users' code
 app.get('/tracking', (req, res) => {
     const userID = req.query.user;
     const apiToken = String(req.query.apitoken);
@@ -104,126 +121,102 @@ app.get('/tracking', (req, res) => {
     res.send(script);
 });
 
-
-// Track which endpoints are hit
-
-app.post('/track', async (req, res) => { // change the route to /track/:id
-    
-
-    // save req.body into database with associated user id
-    console.log("Adding into the database.")
-
+// Saves API analytics
+app.post('/track', async (req, res) => {
+    console.log("Adding tracking data to QuestDB.");
     console.log('Received tracking data:', req.body);
 
-    // decode tracking data:
-    const status_code = req.body.status
+    const { userId, apiToken, apiUrl, method, status, responseTime, timestamp } = req.body;
 
-
-
-    const apitoken = String(req.body.apiToken);
-
-    
-    const responseTime = req.body.responseTime
-    console.log(`Response time: ${responseTime}`)
-    console.log(`Response time type: ${responseTime.type}`)
-
-
-
-    // 1. get api_id from api_token
-    const query = "SELECT ap.id FROM api ap WHERE ap.token = $1"
-    const result = await pool.query(query, [apitoken])
-
-    console.log(query)
-
-    if (result.rows === undefined) {
-        res.status(400).json({"message": "Invalid API token."})
+    // Validate essential fields
+    if (!userId || !apiToken || !apiUrl || !status || !responseTime || !timestamp) {
+        console.error("Missing required tracking data fields.");
+        return res.status(400).send("Missing required tracking data fields.");
     }
 
-    console.log(result.rows)
-    const api_id = result.rows[0].id;
+    let client; // Declare client outside try block to ensure it can be released in finally
 
-    // TIMESTAMP STUFF
-    const new_timestamp = Date.parse(req.body.timestamp.split('T')[0])
-    
-    
-    // UPDATE OR INSERT into database
+    try {
+        // 1. Get api_id from api_token
+        // This query is assuming you have an 'api' table with 'token' and 'id' columns.
+        // Adjust table/column names if they differ in your setup.
+        const apiTokenQuery = "SELECT id FROM api WHERE token = $1";
+        const apiTokenResult = await pool.query(apiTokenQuery, [apiToken]);
 
-    const endDateQuery = "SELECT MAX(end_date) AS latest_end_date FROM api_usage WHERE api_id = $1";
-    const endDateResult = await pool.query(endDateQuery, [api_id]);
-    
-    let end_date;
-    if (endDateResult.rows[0].latest_end_date) {
-        end_date = Date.parse(endDateResult.rows[0].latest_end_date);
-    } else {
-        end_date = 0;
-    }
-
-    if (end_date < new_timestamp) {
-        console.log("here.");
-        
-        // adjust new_timestamp to the first day of its month
-        const newStart = getFirstDayOfMonth(new_timestamp);
-        const newEnd = getLastDayOfMonth(new_timestamp);
-        
-        
-        // INSERT A NEW RECORD
-        let insertQuery = ""
-        if (status_code >= 200 && status_code < 400) {
-            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req, errorcount, total_latency) VALUES ($1, $2, $3, 1, 0, $4)";
-        } else {
-            insertQuery = "INSERT INTO api_usage (api_id, start_date, end_date, total_req, errorcount, total_latency) VALUES ($1, $2, $3, 1, 1, $4)";
+        if (apiTokenResult.rows.length === 0) {
+            console.log(`Invalid API token received: ${apiToken}`);
+            return res.status(400).json({ message: "Invalid API token." });
         }
-        await pool.query(insertQuery, [api_id, newStart, newEnd, responseTime]);
-    
-        console.log("New record inserted with start_date and end_date at the beginning of the month.");
-    } else {
-        console.log("not there.");
-    
-        // Determine the correct query based on status_code
-        let updateQuery = "";
-        if (status_code >= 200 && status_code < 400) {
-            updateQuery = `
-                UPDATE api_usage 
-                SET total_req = total_req + 1,
-                    total_latency = total_latency + $1
-                WHERE api_id = $2
-                AND $3 BETWEEN start_date AND end_date
-            `;
-        } else {
-            updateQuery = `
-                UPDATE api_usage 
-                SET total_req = total_req + 1,
-                    total_latency = total_latency + $1,
-                    errorcount = errorcount + 1 
-                WHERE api_id = $2
-                AND $3 BETWEEN start_date AND end_date
-            `;
-        }
-    
-        // Get the first day of the month for newend_date
-        const newend_date = getFirstDayOfMonth(new_timestamp);
-    
-        await pool.query(updateQuery, [responseTime ,api_id, newend_date]);
-    
-        console.log("Record updated where newend_date is between start_date and end_date.");
-    }
-    
+        const api_id = apiTokenResult.rows[0].id;
 
-    res.send('Tracking data received!!!');
+        // Get a client from the pool
+        client = await pool.connect();
+
+        // 2. Prepare and insert the tracking data into QuestDB
+        //    We are inserting individual events, not aggregating them here.
+        //    QuestDB's 'timestamp' column will be the designated timestamp.
+        //    Ensure your api_traffic_log table has:
+        //    - api_id: SYMBOL (or appropriate type)
+        //    - user_id: SYMBOL (or appropriate type)
+        //    - timestamp: TIMESTAMP
+        //    - method: SYMBOL (or VARCHAR)
+        //    - status: INT
+        //    - response_time_ms: LONG
+
+        const insertQuery = `
+            INSERT INTO api_traffic_log (api_id, user_id, timestamp, method, status, response_time_ms)
+            VALUES ($1, $2, $3, $4, $5, $6)
+        `;
+
+        // QuestDB expects ISO 8601 format for timestamps or JavaScript Date objects when using pg.
+        // req.body.timestamp is likely already in a parseable format (e.g., ISO 8601 string from frontend).
+        // Creating a Date object from it is a safe way to pass it.
+        const timestampObj = new Date(timestamp);
+
+        // Ensure status is treated as a number
+        const numericStatus = parseInt(status, 10);
+
+        // Ensure responseTime is treated as a number
+        const numericResponseTime = parseInt(responseTime, 10);
+
+        await client.query(insertQuery, [
+            api_id,
+            userId,
+            timestampObj,
+            method,
+            numericStatus,
+            numericResponseTime
+        ]);
+
+        console.log(`Successfully inserted tracking data for API ID ${api_id}.`);
+        res.status(200).send('Tracking data received and stored in QuestDB!');
+
+    } catch (error) {
+        console.error('Error processing /track request:', error);
+        // Handle specific errors if necessary (e.g., invalid token, DB errors)
+        if (error.message.includes("Invalid API token")) { // Example: Check for specific token error if returned by pool.query
+             return res.status(400).json({ message: "Invalid API token." });
+        }
+        res.status(500).send('Internal Server Error while processing tracking data.');
+    } finally {
+        // IMPORTANT: Release the client back to the pool
+        if (client) {
+            client.release();
+        }
+    }
 });
 
-function getFirstDayOfMonth(timestamp) {
-    const date = new Date(timestamp);
-    return new Date(date.getFullYear(), date.getMonth(), 1); // First day of the month
-}
 
-function getLastDayOfMonth(timestamp) {
-    const date = new Date(timestamp);
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0); // Last day of the month
-}
+// run server
 
-
-app.listen(process.env.PORT, () => {
-    console.log('Connected to DB & Listening on port', process.env.PORT)
+app.listen(port, () => {
+    console.log(`API server running at http://localhost:${port}`)
 })
 
+// close connection
+
+process.on('SIGINT', async () => {
+    await pool.end()
+    console.log('Pool has ended')
+    process.exit(0)
+})
