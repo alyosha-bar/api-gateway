@@ -1,12 +1,28 @@
 const express = require('express')
-const {Pool} = require('pg')
+const { Pool } = require('pg')
 var cors = require('cors')
+require('dotenv').config();
 
 const app = express()
 const port = 3000
 
+console.log(process.env.NEON_DATABASE_URL)
+
+// Pool for Neon PostgreSQL
+const neonPool = new Pool({
+    connectionString: process.env.NEON_DATABASE_URL,
+    ssl: { 
+        rejectUnauthorized: false 
+    }
+});
+
+// Test Neon connection (optional, but good practice)
+neonPool.connect()
+    .then(() => console.log('Connected to Neon PostgreSQL.'))
+    .catch(err => console.error('Error connecting to Neon PostgreSQL:', err.stack));
+
 const pool = new Pool({
-    host: '127.0.0.1',
+    host: process.env.QUEST_HOST,
     port: 8812,
     user: 'admin',
     password: 'quest',
@@ -70,7 +86,7 @@ app.get('/tracking', (req, res) => {
 
     const script = `
         (function(global) {
-            const trackingServerUrl = 'https://tracker-api-gateway.onrender.com/track';
+            const trackingServerUrl = 'http://localhost:3000/track';
             const originalFetch = global.fetch;
 
             global.fetch = async function(resource, init) {
@@ -142,7 +158,7 @@ app.post('/track', async (req, res) => {
         // This query is assuming you have an 'api' table with 'token' and 'id' columns.
         // Adjust table/column names if they differ in your setup.
         const apiTokenQuery = "SELECT id FROM api WHERE token = $1";
-        const apiTokenResult = await pool.query(apiTokenQuery, [apiToken]);
+        const apiTokenResult = await neonPool.query(apiTokenQuery, [apiToken]);
 
         if (apiTokenResult.rows.length === 0) {
             console.log(`Invalid API token received: ${apiToken}`);
@@ -211,7 +227,7 @@ app.post('/track', async (req, res) => {
 // run server
 
 app.listen(port, () => {
-    console.log(`API server running at http://localhost:${port}`)
+    console.log(`API server running at port: ${port}`)
 })
 
 // close connection
