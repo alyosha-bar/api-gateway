@@ -86,7 +86,7 @@ app.get('/tracking', (req, res) => {
 
     const script = `
         (function(global) {
-            const trackingServerUrl = 'http://localhost:3000/track';
+            const trackingServerUrl = 'https://tracker-api-gateway.onrender.com/track';
             const originalFetch = global.fetch;
 
             global.fetch = async function(resource, init) {
