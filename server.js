@@ -38,46 +38,6 @@ app.use(cors())
 // Add middleware to parse JSON body
 app.use(express.json())
 
-// API endpoint to get recent trades
-app.get('/api/trades', async (req, res) => {
-    const {symbol, limit = 10} = req.query
-
-    try {
-        let query
-        let params = []
-
-        if (symbol) {
-            query = 'SELECT * FROM sensor_data;'
-            params = [symbol, limit]
-        } else {
-            query = 'SELECT * FROM sensor_data;'
-            params = [limit]
-        }
-
-        const result = await pool.query(query, params)
-        res.json(result.rows)
-    } catch (error) {
-        console.error('API error:', error)
-        res.status(500).json({error: error.message})
-    }
-})
-
-// API endpoint to get trade statistics
-app.get('/api/stats', async (req, res) => {
-    const {days = 7} = req.query
-
-    try {
-        const result = await pool.query(`
-      SELECT * FROM sensor_data;
-    `, [days])
-
-        res.json(result.rows)
-    } catch (error) {
-        console.error('API error:', error)
-        res.status(500).json({error: error.message})
-    }
-})
-
 // Tracking endpoint --> injected into users' code
 app.get('/tracking', (req, res) => {
     const userID = req.query.user;
