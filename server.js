@@ -111,13 +111,10 @@ app.post('/track', async (req, res) => {
         return res.status(400).send("Missing required tracking data fields.");
     }
 
-    let client; // Declare client outside try block to ensure it can be released in finally
+    let client;
 
     try {
-        // 1. Get api_id from api_token
-        // This query is assuming you have an 'api' table with 'token' and 'id' columns.
-        // Adjust table/column names if they differ in your setup.
-        const apiTokenQuery = "SELECT id FROM api WHERE token = $1";
+        const apiTokenQuery = "SELECT id FROM apis WHERE api_token = $1";
         const apiTokenResult = await neonPool.query(apiTokenQuery, [apiToken]);
 
         if (apiTokenResult.rows.length === 0) {
@@ -129,25 +126,12 @@ app.post('/track', async (req, res) => {
         // Get a client from the pool
         client = await pool.connect();
 
-        // 2. Prepare and insert the tracking data into QuestDB
-        //    We are inserting individual events, not aggregating them here.
-        //    QuestDB's 'timestamp' column will be the designated timestamp.
-        //    Ensure your api_traffic_log table has:
-        //    - api_id: SYMBOL (or appropriate type)
-        //    - user_id: SYMBOL (or appropriate type)
-        //    - timestamp: TIMESTAMP
-        //    - method: SYMBOL (or VARCHAR)
-        //    - status: INT
-        //    - response_time_ms: LONG
 
         const insertQuery = `
             INSERT INTO api_traffic_log (api_id, user_id, timestamp, method, status, response_time_ms)
             VALUES ($1, $2, $3, $4, $5, $6)
         `;
 
-        // QuestDB expects ISO 8601 format for timestamps or JavaScript Date objects when using pg.
-        // req.body.timestamp is likely already in a parseable format (e.g., ISO 8601 string from frontend).
-        // Creating a Date object from it is a safe way to pass it.
         const timestampObj = new Date(timestamp);
 
         // Ensure status is treated as a number
